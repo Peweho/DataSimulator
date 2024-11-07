@@ -11,7 +11,6 @@ type random struct {
 	BaseModel
 }
 
-// 接收两个参数，生成随机数范围[args[0],args[1])
 func (r *random) Next() (float64, error) {
 	return rand.Float64()*(r.max-r.min) + r.min, nil
 }

@@ -1,11 +1,11 @@
 time:
   start: "2021-01-01 00:00:00"  #起始时间
-  end: "2021-02-01 01:00:00"    #终止时间
-  interval:  100 #时间间隔，单位秒
+  end: "2021-06-01 01:00:00"    #终止时间
+  interval:  1000 #时间间隔，单位秒
 
 # 数据部分
 data:
-  - title: "tempture"
+  - title: "temperature"
     min:
     max: 30
     model: gaussian   # 生成模型类型，默认随机生成

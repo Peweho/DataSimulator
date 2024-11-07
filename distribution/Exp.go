@@ -13,7 +13,6 @@ type Exp struct {
 	lambda float64
 }
 
-// Next 返回指数分布数据
 func (e *Exp) Next() (float64, error) {
 	U := rand.Float64()
 	if e.lambda < 0 {

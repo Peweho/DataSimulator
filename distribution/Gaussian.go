@@ -14,7 +14,6 @@ type Gaussian struct {
 	stddev float64
 }
 
-// Next 接收两个参数，第一个参数为均值，第二个参数为标准差
 func (g *Gaussian) Next() (float64, error) {
 	return rand.NormFloat64()*g.stddev + g.mean, nil
 }

@@ -19,35 +19,18 @@ func main() {
 	}
 	// 解析配置文件
 	config := etc.GetConfig(cfgPath)
-
-	// 计算生成的数据量
-	start, err := time.Parse(time.DateTime, config.Time.Start)
-	if err != nil {
-		util.Log.Fatalf("起始时间格式错误：%v", err)
-		return
-	}
-	end, err := time.Parse(time.DateTime, config.Time.End)
-	if err != nil {
-		util.Log.Fatalf("结束时间格式错误：%v", err)
-		return
-	}
-	gap := end.Sub(start).Seconds()
-	if gap <= 0 {
-		util.Log.Fatalf("时间设置错误：%v", err)
-		return
-	}
-	count := int(gap / float64(config.Time.Interval))
-
+	// 获取数据量和起始时间
+	count, start := GetCountAndStart(config)
+	// 生成数据字段对应的数据模型
 	models := SetModels(config)
+	// 创建传输数据管道
+	ch := make(chan *entity.TimeData, count)
+	// 启动生成excel文件的goroutine
+	exitCreateExcel := make(chan struct{})
+	go CreateExcel(ch, config, exitCreateExcel, start.Location())
 
 	startUnix := start.Unix()
 	internal := config.Time.Interval
-
-	ch := make(chan *entity.FarmEnvData, count)
-
-	// 启动生成excel文件的goroutine
-	exitCreateExcel := make(chan struct{})
-	go CreateExcel(ch, config, exitCreateExcel)
 
 	for i := 0; i < count; i++ {
 		fed := entity.CreateFarmEnvData(startUnix+int64(i*internal), &models)
@@ -57,6 +40,26 @@ func main() {
 
 	//等待生成excel文件的goroutine关闭
 	<-exitCreateExcel
+}
+
+// 解析配置信息，得到生成数据量，开始的时间
+func GetCountAndStart(config *etc.Config) (int, *time.Time) {
+	// 计算生成的数据量
+	start, err := time.Parse(time.DateTime, config.Time.Start)
+	if err != nil {
+		util.Log.Fatalf("起始时间格式错误：%v", err)
+	}
+	end, err := time.Parse(time.DateTime, config.Time.End)
+	if err != nil {
+		util.Log.Fatalf("结束时间格式错误：%v", err)
+	}
+	gap := end.Sub(start).Seconds()
+	if gap <= 0 {
+		util.Log.Fatalf("时间设置错误：%v", err)
+	}
+	count := int(gap/float64(config.Time.Interval)) + 1
+
+	return count, &start
 }
 
 // 解析每项数据段对应的模型
@@ -75,16 +78,17 @@ func SetModels(config *etc.Config) []distribution.Model {
 	return models
 }
 
-func CreateExcel(datach <-chan *entity.FarmEnvData, cfg *etc.Config, exit chan struct{}) {
+// 生成excel文件
+func CreateExcel(datach <-chan *entity.TimeData, cfg *etc.Config, exit chan struct{}, loc *time.Location) {
 	f := excelize.NewFile()
-	sheetName := "fed"
+	sheetName := "simulator"
 	index, err := f.NewSheet(sheetName)
 	if err != nil {
 		panic(err)
 	}
 
 	// 设置表头
-	f.SetCellValue(sheetName, "A1", "时间")
+	f.SetCellValue(sheetName, "A1", "time")
 	for i := 0; i < len(cfg.Data); i++ {
 		name, _ := excelize.ColumnNumberToName(i + 2)
 		f.SetCellValue(sheetName, fmt.Sprintf("%s%d", name, 1), cfg.Data[i].Title)
@@ -93,7 +97,7 @@ func CreateExcel(datach <-chan *entity.FarmEnvData, cfg *etc.Config, exit chan s
 	for data := range datach {
 		// 第一列设置时间
 		//fmt.Printf("%v\n", *data)
-		f.SetCellValue(sheetName, fmt.Sprintf("A%d", rowNum), time.Unix(data.Time, 0).Format(time.DateTime))
+		f.SetCellValue(sheetName, fmt.Sprintf("A%d", rowNum), time.Unix(data.Time, 0).In(loc).Format(time.DateTime))
 		for i := 1; i < len(data.Data)+1; i++ {
 			name, _ := excelize.ColumnNumberToName(i + 1)
 			f.SetCellValue(sheetName, fmt.Sprintf("%s%d", name, rowNum), math.Round(data.Data[i-1]*10)/10.0)
