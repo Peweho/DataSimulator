@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"simulator/util"
-	"sync"
 )
 
 type Config struct {
@@ -28,36 +27,35 @@ type Data struct {
 }
 
 var (
-	cfg  = new(Config)
-	once sync.Once
+	cfg *Config
 )
 
 func GetConfig(path string) *Config {
-	once.Do(func() {
-		var configFilePath string
-		if filepath.IsAbs(path) {
-			configFilePath = path
-		} else {
-			executablePath, err := os.Executable()
-			if err != nil {
-				util.Log.Fatalf("获取绝对路径：%v", err)
-			}
-			executableDir := filepath.Dir(executablePath)
-			configFilePath = filepath.Join(executableDir, path)
-		}
-
-		// 读取配置文件
-		yamlFile, err := os.ReadFile(configFilePath)
+	if cfg != nil {
+		return cfg
+	}
+	cfg = new(Config)
+	var configFilePath string
+	if filepath.IsAbs(path) {
+		configFilePath = path
+	} else {
+		executablePath, err := os.Executable()
 		if err != nil {
-			util.Log.Fatalf("无法读取配置文件：%v", err)
-			return
+			util.Log.Fatalf("获取绝对路径：%v", err)
 		}
+		executableDir := filepath.Dir(executablePath)
+		configFilePath = filepath.Join(executableDir, path)
+	}
 
-		// 解析YAML文件
-		if err = yaml.Unmarshal(yamlFile, cfg); err != nil {
-			util.Log.Fatalf("解析YAML文件失败：%v", err)
-			return
-		}
-	})
+	// 读取配置文件
+	yamlFile, err := os.ReadFile(configFilePath)
+	if err != nil {
+		util.Log.Fatalf("无法读取配置文件：%v", err)
+	}
+
+	// 解析YAML文件
+	if err = yaml.Unmarshal(yamlFile, cfg); err != nil {
+		util.Log.Fatalf("解析YAML文件失败：%v", err)
+	}
 	return cfg
 }

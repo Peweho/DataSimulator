@@ -12,8 +12,18 @@ import (
 	"time"
 )
 
+var (
+	cfgPath = "./etc.yaml"
+)
+
 func main() {
-	cfgPath := "./etc.yaml"
+	start := time.Now()
+	//ConcurrencyRun()
+	NotConcurrencyRun()
+	util.Log.Printf("耗时：%v", time.Now().Sub(start).Nanoseconds())
+}
+
+func NotConcurrencyRun() {
 	if len(os.Args) > 1 {
 		cfgPath = os.Args[1]
 	}
@@ -33,8 +43,8 @@ func main() {
 	internal := config.Time.Interval
 
 	for i := 0; i < count; i++ {
-		fed := entity.CreateFarmEnvData(startUnix+int64(i*internal), &models)
-		ch <- fed
+		td := entity.CreateTimeData(startUnix+int64(i*internal), i+2, &models)
+		ch <- td
 	}
 	close(ch)
 
@@ -93,16 +103,13 @@ func CreateExcel(datach <-chan *entity.TimeData, cfg *etc.Config, exit chan stru
 		name, _ := excelize.ColumnNumberToName(i + 2)
 		f.SetCellValue(sheetName, fmt.Sprintf("%s%d", name, 1), cfg.Data[i].Title)
 	}
-	rowNum := 2
 	for data := range datach {
 		// 第一列设置时间
-		//fmt.Printf("%v\n", *data)
-		f.SetCellValue(sheetName, fmt.Sprintf("A%d", rowNum), time.Unix(data.Time, 0).In(loc).Format(time.DateTime))
+		f.SetCellValue(sheetName, fmt.Sprintf("A%d", data.Row), time.Unix(data.Time, 0).In(loc).Format(time.DateTime))
 		for i := 1; i < len(data.Data)+1; i++ {
 			name, _ := excelize.ColumnNumberToName(i + 1)
-			f.SetCellValue(sheetName, fmt.Sprintf("%s%d", name, rowNum), math.Round(data.Data[i-1]*10)/10.0)
+			f.SetCellValue(sheetName, fmt.Sprintf("%s%d", name, data.Row), math.Round(data.Data[i-1]*10)/10.0)
 		}
-		rowNum++
 	}
 	f.SetActiveSheet(index)
 

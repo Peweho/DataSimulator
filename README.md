@@ -50,7 +50,7 @@ simulator path
 
 ## 生成数据模型
 
-模型提供正态分布（gaussian），指数分布（exp）和随机生成（random）
+模型提供正态分布（gaussian），指数分布（exp）和均匀分布（random）
 
 ### 1、Gaussian
 
@@ -73,7 +73,7 @@ params: [lambda] 		#接收一个参数
 - 如果lambda为正数时，生成数据大于等于min
 - 如果lambda为负数时，生成数据小于等于max
 
-### 3、随机生成
+### 3、均匀分布
 
 ```yaml
 model: random
