@@ -5,13 +5,24 @@ time:
 
 # 数据部分
 data:
-  - title: "temperature"
+  - title: "温度"
+    id: "temperature"
+    frequency: 10
     min:
     max: 30
     model: gaussian   # 生成模型类型，默认随机生成
     params: [25,2]   # 模型参数
-  - title: "humidity"
+
+  - title: "湿度"
+    id: "humidity"
+    frequency: 10
     min: 50
     max: 60
     model: exp
     params: [-0.5]
+# 消息队列，目前支持kafka
+mq:
+  addr:
+  topic:
+  partition:
+  timeout:

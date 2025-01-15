@@ -8,8 +8,10 @@ import (
 )
 
 type Config struct {
-	Time Ftime  `yaml:"time"`
-	Data []Data `yaml:"data"`
+	Time       Ftime    `yaml:"time"`
+	Data       []Data   `yaml:"data"`
+	Mq         MqClient `yaml:"mq"`
+	DataBaseId string
 }
 
 type Ftime struct {
@@ -19,11 +21,13 @@ type Ftime struct {
 }
 
 type Data struct {
-	Title  string   `yaml:"title"`
-	Min    float64  `yaml:"min"`
-	Max    float64  `yaml:"max"`
-	Model  string   `yaml:"model"`
-	Params []string `yaml:"params"`
+	Title     string   `yaml:"title"`
+	Min       float64  `yaml:"min"`
+	Max       float64  `yaml:"max"`
+	Model     string   `yaml:"model"`
+	Params    []string `yaml:"params"`
+	Id        string   `yaml:"id"`
+	Frequency int64    `yaml:"frequency"`
 }
 
 var (
@@ -31,7 +35,7 @@ var (
 )
 
 func GetConfig(path string) *Config {
-	if cfg != nil {
+	if cfg != nil && path == "" {
 		return cfg
 	}
 	cfg = new(Config)
