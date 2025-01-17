@@ -18,3 +18,13 @@ func CreateTimeData(T int64, row int, models *[]distribution.Model) *TimeData {
 	}
 	return td
 }
+
+type TimeDatas struct {
+	Time int64 // 时间
+	Data []TimeData2
+}
+
+type TimeData2 struct {
+	Id    string  `json:"id"`
+	Value float64 `json:"value"`
+}

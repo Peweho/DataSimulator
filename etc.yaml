@@ -26,3 +26,8 @@ mq:
   topic:
   partition:
   timeout:
+
+# 判断真实环境还是虚拟环境
+# virtual 虚拟环境，会生成excel文件
+# truth 真实环境，按照真实时间频率生成，不生产excel文件，投递到消息队列
+env: truthexit

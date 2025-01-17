@@ -12,6 +12,7 @@ type Config struct {
 	Data       []Data   `yaml:"data"`
 	Mq         MqClient `yaml:"mq"`
 	DataBaseId string
+	Env        string `yaml:"env"`
 }
 
 type Ftime struct {
@@ -62,4 +63,9 @@ func GetConfig(path string) *Config {
 		util.Log.Fatalf("解析YAML文件失败：%v", err)
 	}
 	return cfg
+}
+
+// 判断真实环境还是虚拟环境
+func IsVirtual() bool {
+	return cfg.Env == "virtual"
 }
