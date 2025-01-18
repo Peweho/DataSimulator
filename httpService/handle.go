@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"simulator/etc"
+	"simulator/generate"
 	"strconv"
 )
 
@@ -47,6 +48,7 @@ func setDataFrequency(ctx *gin.Context) {
 		config := etc.GetConfig("")
 		for i, val := range config.Data {
 			if val.Id == id {
+				generate.UpdateFrequency(i, id, val.Frequency, fre)
 				config.Data[i].Frequency = fre
 				HttpMsg(ctx, http.StatusOK, "修改成功")
 				return

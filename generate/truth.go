@@ -6,6 +6,7 @@ import (
 	"simulator/distribution"
 	"simulator/entity"
 	"simulator/etc"
+	"simulator/mq/kafka"
 	"simulator/util"
 	"sync"
 	"time"
@@ -14,20 +15,24 @@ import (
 // 按照采集频率分组
 var (
 	buckets    map[int64]*[]*etc.Data
-	exit       chan struct{}
 	wg         *sync.WaitGroup
 	ctx        context.Context
 	cancelFunc context.CancelFunc
+	kq         *kafka.KafkaClient
+	config     *etc.Config
+	lock       sync.Mutex
 )
 
 func init() {
 	buckets = make(map[int64]*[]*etc.Data, 0)
 	wg = &sync.WaitGroup{}
+	lock = sync.Mutex{}
 	ctx, cancelFunc = context.WithCancel(context.Background())
 }
 
 func TruthEnvGenerateData() error {
-	config := etc.GetConfig("")
+	config = etc.GetConfig("")
+	kq = kafka.NewKafkaClient(config.Mq.Addr, config.Mq.Topic, config.Mq.Partition, config.Mq.TimeOut)
 	// 更具采集频率分组
 	var bucket *[]*etc.Data
 	for i := 0; i < len(config.Data); i++ {
@@ -43,16 +48,9 @@ func TruthEnvGenerateData() error {
 		*bucket = append(*bucket, &config.Data[i])
 	}
 	// 启动定时人任务
-
-	start, err := time.Parse(time.DateTime, config.Time.Start)
-	if err != nil {
-		util.Log.Fatalf("起始时间格式错误：%v", err)
-	}
-
-	exit = make(chan struct{}, len(buckets))
 	for frequency, data := range buckets {
 		wg.Add(1)
-		go generateDataByTime(start.Unix(), frequency, data)
+		go generateDataByTime(time.Now().Unix(), frequency, data)
 	}
 	return nil
 }
@@ -79,7 +77,10 @@ func generateDataByTime(start int64, frequency int64, data *[]*etc.Data) {
 			if err != nil {
 				util.Log.Fatalf("序列化数据错误：%v", err)
 			}
-			util.Log.Println(string(marshal))
+			// 发送到kafka
+			if err = kq.Write([]byte(""), marshal); err != nil {
+				util.Log.Printf("发送消息：[%s],fail: %s", string(marshal), err)
+			}
 		}
 		time.Sleep(time.Duration(loopTime) * time.Second)
 		now += loopTime
@@ -87,6 +88,8 @@ func generateDataByTime(start int64, frequency int64, data *[]*etc.Data) {
 }
 
 func createTimeDatas(T int64, data *[]*etc.Data) *entity.TimeDatas {
+	lock.Lock()
+	defer lock.Unlock()
 	td := &entity.TimeDatas{Time: T}
 	models := setModelsBytruth(*data)
 	td.Data = make([]entity.TimeData2, len(models))
@@ -110,6 +113,31 @@ func setModelsBytruth(data []*etc.Data) []distribution.Model {
 		models[i] = model
 	}
 	return models
+}
+
+func UpdateFrequency(index int, id string, oldFre, fre int64) {
+	lock.Lock()
+	defer lock.Unlock()
+	// 移除原来的桶中的数据
+	bucket := buckets[oldFre]
+	for i := 0; i < len(*bucket); i++ {
+		if (*bucket)[i].Id == id {
+			*bucket = append((*bucket)[:i], (*bucket)[i+1:]...)
+			break
+		}
+	}
+	// 加入新通
+	// 判断是否需要开启协程
+	bucket, ok := buckets[fre]
+	if ok {
+		(*bucket) = append((*bucket), &config.Data[index])
+	} else {
+		datas := make([]*etc.Data, 0)
+		datas = append(datas, &config.Data[index])
+		buckets[fre] = &datas
+		wg.Add(1)
+		go generateDataByTime(time.Now().Unix(), fre, &datas)
+	}
 }
 
 func Stop() {

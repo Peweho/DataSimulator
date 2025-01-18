@@ -20,8 +20,9 @@ func CreateTimeData(T int64, row int, models *[]distribution.Model) *TimeData {
 }
 
 type TimeDatas struct {
-	Time int64 // 时间
-	Data []TimeData2
+	DataBaseId string `json:"data_base_id"`
+	Time       int64  `json:"time"` // 时间
+	Data       []TimeData2
 }
 
 type TimeData2 struct {

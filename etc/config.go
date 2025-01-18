@@ -11,8 +11,8 @@ type Config struct {
 	Time       Ftime    `yaml:"time"`
 	Data       []Data   `yaml:"data"`
 	Mq         MqClient `yaml:"mq"`
-	DataBaseId string
-	Env        string `yaml:"env"`
+	DataBaseId string   `yaml:"dataBaseId"`
+	Env        string   `yaml:"env"`
 }
 
 type Ftime struct {
@@ -29,6 +29,13 @@ type Data struct {
 	Params    []string `yaml:"params"`
 	Id        string   `yaml:"id"`
 	Frequency int64    `yaml:"frequency"`
+}
+
+type MqClient struct {
+	Addr      string `yaml:"addr"`
+	Topic     string `yaml:"topic"`
+	Partition int    `yaml:"partition"`
+	TimeOut   int    `yaml:"timeout"`
 }
 
 var (
