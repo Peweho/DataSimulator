@@ -2,7 +2,41 @@
 
 ## 使用
 
-### 1、填写配置文件
+使用分为真实环境和虚拟环境，提供配置文件的Env参数确定
+
+- 真实环境：时间戳为真实时间，数据发送到Kafka消息队列，没有配置输出到控制台，支持为每个数据定义生成频率
+- 虚拟环境：根据time的配置生成时间戳，最后输出Excel文件，不支持每个数据定义生成频率
+
+### 1、真实环境配置
+
+```yaml
+# 数据部分
+data:
+  - title: "温度"
+    id: "temperature"
+    frequency: 10 #生成频率。单位s
+    min:
+    max: 30
+    model: gaussian   # 生成模型类型，默认随机生成
+    params: [25,2]   # 模型参数
+
+  - title: "湿度"
+    id: "humidity"
+    frequency: 10
+    min: 50
+    max: 60
+    model: exp
+    params: [-0.5]
+mq:
+  addr:
+  topic:
+  partition: 0
+  timeout: 500  #ms
+
+env: truth
+```
+
+### 2、虚拟环境配置
 
 ```yaml
 time:
@@ -22,6 +56,8 @@ data:
     max: 100
     model: random
     params:
+    
+env: virtual
 ```
 
 time接收三项配置
@@ -81,3 +117,150 @@ params:             #不接受参数
 ```
 
 数据范围为[min,max)
+
+## Kafka
+
+提供将生成的数据发送到Kafka上，需要填写对应信息以及选择真实环境，无需填写
+
+```yaml
+mq:
+  addr:
+  topic:
+  partition: 0
+  timeout: 500  #ms
+env: truth
+```
+
+## HTTP服务
+
+提供三个接口，分别是修改数据的生成频率、修改绑定的数据库、查询数据详情
+
+### GET 查询数据详情
+
+GET /list
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "id": "string",
+  "frequency": "string"
+}
+```
+
+#### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明 | 数据模型 |
+| ------ | ------------------------------------------------------- | ---- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | none | Inline   |
+
+#### 返回数据结构
+
+状态码 **200**
+
+| 名称        | 类型   | 必选 | 约束 | 中文名   | 说明 |
+| ----------- | ------ | ---- | ---- | -------- | ---- |
+| » id        | string | true | none | 数据项id | none |
+| » frequency | string | true | none | 采集频率 | none |
+
+### POST 修改数据采集频率
+
+POST /set/frequency
+
+> Body 请求参数
+
+```yaml
+id: temperature
+frequency: 12
+
+```
+
+#### 请求参数
+
+| 名称        | 位置 | 类型    | 必选 | 说明                   |
+| ----------- | ---- | ------- | ---- | ---------------------- |
+| body        | body | object  | 否   | none                   |
+| » id        | body | string  | 否   | 数据项id               |
+| » frequency | body | integer | 否   | 改后的采集频率，单位秒 |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "msg": "string"
+}
+```
+
+#### 返回结果
+
+| 状态码 | 状态码含义                                                   | 说明 | 数据模型 |
+| ------ | ------------------------------------------------------------ | ---- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)      | none | Inline   |
+| 400    | [Bad Request](https://tools.ietf.org/html/rfc7231#section-6.5.1) | none | Inline   |
+
+#### 返回数据结构
+
+状态码 **200**
+
+| 名称  | 类型   | 必选 | 约束 | 中文名   | 说明 |
+| ----- | ------ | ---- | ---- | -------- | ---- |
+| » msg | string | true | none | 返回信息 | none |
+
+状态码 **400**
+
+| 名称  | 类型   | 必选 | 约束 | 中文名   | 说明 |
+| ----- | ------ | ---- | ---- | -------- | ---- |
+| » msg | string | true | none | 返回信息 | none |
+
+### POST 绑定数据库
+
+POST /bind/db
+
+> Body 请求参数
+
+```yaml
+id: ""
+
+```
+
+#### 请求参数
+
+| 名称 | 位置 | 类型   | 必选 | 说明     |
+| ---- | ---- | ------ | ---- | -------- |
+| body | body | object | 否   | none     |
+| » id | body | string | 否   | 数据库id |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "msg": "string"
+}
+```
+
+#### 返回结果
+
+| 状态码 | 状态码含义                                                   | 说明 | 数据模型 |
+| ------ | ------------------------------------------------------------ | ---- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)      | none | Inline   |
+| 400    | [Bad Request](https://tools.ietf.org/html/rfc7231#section-6.5.1) | none | Inline   |
+
+#### 返回数据结构
+
+状态码 **200**
+
+| 名称  | 类型   | 必选 | 约束 | 中文名   | 说明 |
+| ----- | ------ | ---- | ---- | -------- | ---- |
+| » msg | string | true | none | 返回信息 | none |
+
+状态码 **400**
+
+| 名称  | 类型   | 必选 | 约束 | 中文名   | 说明 |
+| ----- | ------ | ---- | ---- | -------- | ---- |
+| » msg | string | true | none | 返回信息 | none |

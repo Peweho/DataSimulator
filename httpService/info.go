@@ -6,7 +6,8 @@ import (
 
 func HttpMsg(ctx *gin.Context, code int, msg string) {
 	ctx.JSON(code, gin.H{
-		"msg": msg,
+		"code": code,
+		"msg":  msg,
 	})
 }
 

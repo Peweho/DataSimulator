@@ -6,7 +6,7 @@ time:
 # 数据部分
 data:
   - title: "温度"
-    id: "temperature"
+    id: "outdoor_air_temperature"
     frequency: 10
     min:
     max: 30
@@ -14,7 +14,7 @@ data:
     params: [25,2]   # 模型参数
 
   - title: "湿度"
-    id: "humidity"
+    id: "outdoor_air_humidity"
     frequency: 10
     min: 50
     max: 60
@@ -31,3 +31,6 @@ mq:
 # virtual 虚拟环境，会生成excel文件
 # truth 真实环境，按照真实时间频率生成，不生产excel文件，投递到消息队列
 env: truth
+
+# 手动绑定数据库
+dataBaseId: 3

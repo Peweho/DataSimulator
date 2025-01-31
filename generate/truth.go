@@ -3,6 +3,7 @@ package generate
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"simulator/distribution"
 	"simulator/entity"
 	"simulator/etc"
@@ -20,13 +21,13 @@ var (
 	cancelFunc context.CancelFunc
 	kq         *kafka.KafkaClient
 	config     *etc.Config
-	lock       sync.Mutex
+	locks      *sync.Map
 )
 
 func init() {
 	buckets = make(map[int64]*[]*etc.Data, 0)
 	wg = &sync.WaitGroup{}
-	lock = sync.Mutex{}
+	locks = &sync.Map{} //make(map[int64]*sync.Mutex, 0)
 	ctx, cancelFunc = context.WithCancel(context.Background())
 }
 
@@ -43,6 +44,7 @@ func TruthEnvGenerateData() error {
 		if _, ok := buckets[data.Frequency]; !ok {
 			datas := make([]*etc.Data, 0)
 			buckets[data.Frequency] = &datas
+			locks.Store(data.Frequency, &sync.Mutex{})
 		}
 		bucket = buckets[data.Frequency]
 		*bucket = append(*bucket, &config.Data[i])
@@ -56,6 +58,7 @@ func TruthEnvGenerateData() error {
 }
 
 func generateDataByTime(start int64, frequency int64, data *[]*etc.Data) {
+	defer wg.Done()
 	// 每隔五秒循环一次，检查是否推出
 	var loopTime int64 = 5
 	// 离上一次产生数据时间
@@ -64,7 +67,6 @@ func generateDataByTime(start int64, frequency int64, data *[]*etc.Data) {
 	for {
 		select {
 		case <-ctx.Done():
-			wg.Done()
 			return
 		default:
 			if countTime < frequency {
@@ -72,15 +74,27 @@ func generateDataByTime(start int64, frequency int64, data *[]*etc.Data) {
 				break
 			}
 			countTime = loopTime
+			// 检查切片中是否还有任务，如果有生成数据
+			lock(frequency)
+			if len(*data) == 0 {
+				delete(buckets, frequency)
+				unlock(frequency)
+				locks.Delete(frequency)
+				return
+			}
 			datas := createTimeDatas(now, data)
-			marshal, err := json.Marshal(datas)
-			if err != nil {
-				util.Log.Fatalf("序列化数据错误：%v", err)
-			}
-			// 发送到kafka
-			if err = kq.Write([]byte(""), marshal); err != nil {
-				util.Log.Printf("发送消息：[%s],fail: %s", string(marshal), err)
-			}
+			unlock(frequency)
+			// 处理生产的数据
+			go func() {
+				marshal, err := json.Marshal(datas)
+				if err != nil {
+					util.Log.Fatalf("序列化数据错误：%v", err)
+				}
+				// 发送到kafka
+				if err = kq.Write([]byte(""), marshal); err != nil {
+					fmt.Println(string(marshal))
+				}
+			}()
 		}
 		time.Sleep(time.Duration(loopTime) * time.Second)
 		now += loopTime
@@ -88,9 +102,7 @@ func generateDataByTime(start int64, frequency int64, data *[]*etc.Data) {
 }
 
 func createTimeDatas(T int64, data *[]*etc.Data) *entity.TimeDatas {
-	lock.Lock()
-	defer lock.Unlock()
-	td := &entity.TimeDatas{Time: T}
+	td := &entity.TimeDatas{Time: T, DataBaseId: config.DataBaseId}
 	models := setModelsBytruth(*data)
 	td.Data = make([]entity.TimeData2, len(models))
 	for i := 0; i < len(models); i++ {
@@ -116,8 +128,7 @@ func setModelsBytruth(data []*etc.Data) []distribution.Model {
 }
 
 func UpdateFrequency(index int, id string, oldFre, fre int64) {
-	lock.Lock()
-	defer lock.Unlock()
+	lock(oldFre)
 	// 移除原来的桶中的数据
 	bucket := buckets[oldFre]
 	for i := 0; i < len(*bucket); i++ {
@@ -126,15 +137,19 @@ func UpdateFrequency(index int, id string, oldFre, fre int64) {
 			break
 		}
 	}
-	// 加入新通
+	unlock(oldFre)
+	// 加入新桶
 	// 判断是否需要开启协程
 	bucket, ok := buckets[fre]
 	if ok {
-		(*bucket) = append((*bucket), &config.Data[index])
+		lock(fre)
+		*bucket = append((*bucket), &config.Data[index])
+		unlock(fre)
 	} else {
 		datas := make([]*etc.Data, 0)
 		datas = append(datas, &config.Data[index])
 		buckets[fre] = &datas
+		locks.Store(fre, &sync.Mutex{})
 		wg.Add(1)
 		go generateDataByTime(time.Now().Unix(), fre, &datas)
 	}
@@ -144,4 +159,22 @@ func Stop() {
 	cancelFunc()
 	wg.Wait()
 	util.Log.Println("停止生成数据")
+}
+
+func lock(key any) {
+	value, ok := locks.Load(key)
+	if !ok {
+		util.Log.Fatalf("锁不存在")
+	}
+	lockVal := value.(*sync.Mutex)
+	lockVal.Lock()
+}
+
+func unlock(key any) {
+	value, ok := locks.Load(key)
+	if !ok {
+		util.Log.Fatalf("锁不存在")
+	}
+	lockVal := value.(*sync.Mutex)
+	lockVal.Unlock()
 }
